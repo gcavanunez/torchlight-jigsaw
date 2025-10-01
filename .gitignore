@@ -22,3 +22,4 @@ composer.lock
 .phpunit.result.cache
 tests/Site/build_testing/
 tests/Site/torchlight.php
+.phpunit.cache/

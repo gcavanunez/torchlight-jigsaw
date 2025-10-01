@@ -11,9 +11,13 @@ use Illuminate\Container\Container;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\View\Component;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
+use TightenCo\Jigsaw\Bootstrap\HandleExceptions;
 use TightenCo\Jigsaw\Console\BuildCommand;
+use TightenCo\Jigsaw\File\Filesystem;
 use TightenCo\Jigsaw\Jigsaw;
 use Torchlight\Block;
 use Torchlight\Jigsaw\Exceptions\UnrenderedBlockException;
@@ -26,48 +30,80 @@ class BaseTest extends TestCase
 
     protected $container;
 
+    protected Filesystem $filesystem;
+
+    protected string $sitePath;
+
+    public function __construct($name = null, array $data = [], $dataName = '')
+    {
+        parent::__construct($name, $data, $dataName);
+
+        $this->sitePath = __DIR__ . '/Site';
+
+        $this->filesystem = new Filesystem;
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->container) {
+            $this->container->flush();
+        }
+
+        if (method_exists(Component::class, 'flushCache')) {
+            Component::flushCache();
+            Component::forgetComponentsResolver();
+            Component::forgetFactory();
+        }
+
+        if ($this->status()->isSuccess()) {
+            $this->filesystem->deleteDirectory(app()->cachePath());
+
+            $this->filesystem->delete("$this->sitePath/torchlight.php");
+        }
+
+        HandleExceptions::flushState();
+
+        parent::tearDown();
+    }
+
     protected function prepareForBuilding()
     {
-        $sitePath = __DIR__ . '/Site';
-
-        // Clear out the old build directory.
-        if (is_dir("$sitePath/build_testing")) {
-            exec("rm -rf $sitePath/build_testing");
-        }
-
-        // Clear the old config.
-        if (file_exists("$sitePath/torchlight.php")) {
-            exec("rm $sitePath/torchlight.php");
-        }
-
-        /**
-         * These next lines basically mimic the /vendor/bin/jigsaw.php file.
-         */
-        require realpath(__DIR__ . '/../vendor/tightenco/jigsaw/jigsaw-core.php');
-
-        $this->app = new Application('Jigsaw', '1.3.37');
+        $this->app = new \Symfony\Component\Console\Application('Jigsaw', '1.8.2');
 
         /** @var Container $container */
-        $this->container = $container;
+        $this->container = new \TightenCo\Jigsaw\Container;
 
-        $this->container->instance('cwd', $sitePath);
+        // Bootstrap error handling like official Jigsaw
+        $this->container->singleton(
+            \Illuminate\Contracts\Debug\ExceptionHandler::class,
+            \TightenCo\Jigsaw\Exceptions\Handler::class,
+        );
+
+        $this->container->bootstrapWith([
+            \TightenCo\Jigsaw\Bootstrap\HandleExceptions::class,
+        ]);
+
+        // Set up paths correctly
         $this->container->buildPath = [
-            'source' => $sitePath,
-            'views' => $sitePath,
-            'destination' => "$sitePath/build_testing",
+            'source' => $this->sitePath,
+            'views' => $this->sitePath,
+            'destination' => "$this->sitePath/build_testing",
         ];
+
+        // Set environment
+        $this->container['env'] = 'testing';
 
         // There are other Jigsaw commands we could register,
         // but we dont' need them so we don't add them.
         $this->app->add(new BuildCommand($this->container));
-        Jigsaw::addUserCommands($this->app, $this->container);
 
         // This is from the bottom of jigsaw-core.php. We have to do it
         // ourselves since we're in a different working directory than
         // that file expects us to be.
+        $container = $this->container;
         $events = $this->container->events;
 
-        include "$sitePath/bootstrap.php";
+        include "$this->sitePath/bootstrap.php";
 
         Http::swap(new Factory);
     }
@@ -76,8 +112,16 @@ class BaseTest extends TestCase
     {
         // Turn off the Jigsaw progress bars.
         $this->container->consoleOutput->setup($verbosity = -1);
+
+        // Update build paths for the specific source
+        // Keep views pointing to main Site directory where _layouts are located
+        $this->container->buildPath = [
+            'source' => __DIR__ . "/Site/$source",
+            'views' => __DIR__ . "/Site", 
+            'destination' => __DIR__ . "/Site/build_testing",
+        ];
+
         $jigsaw = $this->container->make(Jigsaw::class);
-        $jigsaw->setSourcePath(__DIR__ . "/Site/$source");
         $jigsaw->build('testing');
     }
 
@@ -89,7 +133,7 @@ class BaseTest extends TestCase
         $this->assertEquals($expected, $actual, "Checking snapshot $file");
     }
 
-    /** @test */
+    #[Test]
     public function most_of_the_tests_are_here()
     {
         TorchlightExtension::macro('afterStandaloneConfiguration', function () {
@@ -126,7 +170,7 @@ class BaseTest extends TestCase
         $this->assertSnapshotMatches('code-indents-work');
     }
 
-    /** @test */
+    #[Test]
     public function no_blocks_doesnt_create_an_error()
     {
         TorchlightExtension::macro('afterStandaloneConfiguration', function () {
@@ -145,7 +189,7 @@ class BaseTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /** @test */
+    #[Test]
     public function non_existent_block_throws()
     {
         TorchlightExtension::macro('afterStandaloneConfiguration', function () {
@@ -167,7 +211,7 @@ class BaseTest extends TestCase
         $this->assertTrue(false);
     }
 
-    /** @test */
+    #[Test]
     public function expected_non_existent_block_is_fine()
     {
         TorchlightExtension::macro('afterStandaloneConfiguration', function () {
@@ -187,7 +231,7 @@ class BaseTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /** @test */
+    #[Test]
     public function can_manually_add_blocks()
     {
         TorchlightExtension::macro('afterStandaloneConfiguration', function () {
@@ -242,7 +286,7 @@ class BaseTest extends TestCase
         $this->assertSnapshotMatches('manually-added');
     }
 
-    /** @test */
+    #[Test]
     public function dark_mode_works()
     {
         TorchlightExtension::macro('afterStandaloneConfiguration', function () {
@@ -317,7 +361,7 @@ class BaseTest extends TestCase
         $this->assertSnapshotMatches('dark-mode');
     }
 
-    /** @test */
+    #[Test]
     public function test_publish_command()
     {
         $this->assertFalse(file_exists(__DIR__ . '/Site/torchlight.php'));
