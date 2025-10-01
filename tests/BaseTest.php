@@ -7,7 +7,7 @@ namespace Torchlight\Jigsaw\Tests;
 
 use Illuminate\Cache\NullStore;
 use Illuminate\Cache\Repository;
-use Illuminate\Container\Container;
+use TightenCo\Jigsaw\Container;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -68,12 +68,13 @@ class BaseTest extends TestCase
 
     protected function prepareForBuilding()
     {
+        // Keeping it fully qualified here to make it easier 
+        // to compare with the jigsaw initialization flow
         $this->app = new \Symfony\Component\Console\Application('Jigsaw', '1.8.2');
 
         /** @var Container $container */
         $this->container = new \TightenCo\Jigsaw\Container;
 
-        // Bootstrap error handling like official Jigsaw
         $this->container->singleton(
             \Illuminate\Contracts\Debug\ExceptionHandler::class,
             \TightenCo\Jigsaw\Exceptions\Handler::class,
@@ -83,21 +84,19 @@ class BaseTest extends TestCase
             \TightenCo\Jigsaw\Bootstrap\HandleExceptions::class,
         ]);
 
-        // Set up paths correctly
         $this->container->buildPath = [
             'source' => $this->sitePath,
             'views' => $this->sitePath,
             'destination' => "$this->sitePath/build_testing",
         ];
 
-        // Set environment
         $this->container['env'] = 'testing';
 
         // There are other Jigsaw commands we could register,
         // but we dont' need them so we don't add them.
         $this->app->add(new BuildCommand($this->container));
 
-        // This is from the bottom of jigsaw-core.php. We have to do it
+        // This is from the bottom of jigsaw. We have to do it
         // ourselves since we're in a different working directory than
         // that file expects us to be.
         $container = $this->container;
@@ -113,8 +112,6 @@ class BaseTest extends TestCase
         // Turn off the Jigsaw progress bars.
         $this->container->consoleOutput->setup($verbosity = -1);
 
-        // Update build paths for the specific source
-        // Keep views pointing to main Site directory where _layouts are located
         $this->container->buildPath = [
             'source' => __DIR__ . "/Site/$source",
             'views' => __DIR__ . "/Site", 
