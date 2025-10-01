@@ -7,16 +7,15 @@ namespace Torchlight\Jigsaw\Tests;
 
 use Illuminate\Cache\NullStore;
 use Illuminate\Cache\Repository;
-use TightenCo\Jigsaw\Container;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\View\Component;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Console\Application;
 use TightenCo\Jigsaw\Bootstrap\HandleExceptions;
 use TightenCo\Jigsaw\Console\BuildCommand;
+use TightenCo\Jigsaw\Container;
 use TightenCo\Jigsaw\File\Filesystem;
 use TightenCo\Jigsaw\Jigsaw;
 use Torchlight\Block;
@@ -114,8 +113,8 @@ class BaseTest extends TestCase
 
         $this->container->buildPath = [
             'source' => __DIR__ . "/Site/$source",
-            'views' => __DIR__ . "/Site",
-            'destination' => __DIR__ . "/Site/build_testing",
+            'views' => __DIR__ . '/Site',
+            'destination' => __DIR__ . '/Site/build_testing',
         ];
 
         $jigsaw = $this->container->make(Jigsaw::class);
