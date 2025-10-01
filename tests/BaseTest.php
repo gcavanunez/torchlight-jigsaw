@@ -68,7 +68,7 @@ class BaseTest extends TestCase
 
     protected function prepareForBuilding()
     {
-        // Keeping it fully qualified here to make it easier 
+        // Keeping it fully qualified here to make it easier
         // to compare with the jigsaw initialization flow
         $this->app = new \Symfony\Component\Console\Application('Jigsaw', '1.8.2');
 
@@ -114,7 +114,7 @@ class BaseTest extends TestCase
 
         $this->container->buildPath = [
             'source' => __DIR__ . "/Site/$source",
-            'views' => __DIR__ . "/Site", 
+            'views' => __DIR__ . "/Site",
             'destination' => __DIR__ . "/Site/build_testing",
         ];
 
